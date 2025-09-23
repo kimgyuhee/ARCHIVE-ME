@@ -1,6 +1,6 @@
-[https://kimgyuhee.github.io/ARCHIVE-ME/]
 
-# 🌟 ARCHIVE ME
+
+# 🌟 [ARCHIVE ME](https://kimgyuhee.github.io/ARCHIVE-ME/)
 
 나의 기록을 담은 **개인 웹 아카이브**  🐿️
 
