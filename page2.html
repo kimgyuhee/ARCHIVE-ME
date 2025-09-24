@@ -26,6 +26,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         header h1 {
@@ -46,11 +49,17 @@
             border: 1px solid #ccc;
         }
 
+        #cartBtn {
+            margin-left: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
         /* 배너 */
         .banner {
             width: 100%;
-            height: 300px;
-            background: url('https://via.placeholder.com/1200x300') center/cover no-repeat;
+            height: 250px;
+            background: url('https://via.placeholder.com/1200x250') center/cover no-repeat;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -120,10 +129,53 @@
             background: #e65b50;
         }
 
-        /* 별점 */
         .stars {
             color: #ffcc00;
             margin-top: 5px;
+        }
+
+        /* 장바구니 모달 */
+        #cartModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 350px;
+            height: 100%;
+            background: #fff;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 200;
+            transition: 0.3s;
+        }
+
+        #cartModal.active {
+            display: block;
+        }
+
+        #cartModal h2 {
+            margin-top: 0;
+        }
+
+        #cartModal .cart-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        #cartModal .cart-item span {
+            margin-right: 10px;
+        }
+
+        #cartModal button.close {
+            background: #ff6f61;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            float: right;
+            border-radius: 4px;
         }
 
         /* 푸터 */
@@ -148,6 +200,7 @@
             <a href="#">문의</a>
         </nav>
         <input type="text" id="searchInput" placeholder="검색어 입력..." />
+        <span id="cartBtn">🛒 장바구니 (<span id="cartCount">0</span>)</span>
     </header>
 
     <div class="banner">
@@ -158,6 +211,13 @@
         <!-- JS로 상품 생성 -->
     </section>
 
+    <div id="cartModal">
+        <button class="close" onclick="toggleCart()">닫기 ✖</button>
+        <h2>장바구니</h2>
+        <div id="cartItems"></div>
+        <h3>총합계: <span id="cartTotal">₩0</span></h3>
+    </div>
+
     <footer>
         &copy; 2025 My Shop. All rights reserved.
     </footer>
@@ -166,39 +226,41 @@
         const products = [{
                 name: "상품 1",
                 desc: "간단한 설명",
-                price: "₩19,900",
+                price: 19900,
                 img: "https://via.placeholder.com/220x220",
                 stars: 4
             },
             {
                 name: "상품 2",
                 desc: "간단한 설명",
-                price: "₩24,900",
+                price: 24900,
                 img: "https://via.placeholder.com/220x220",
                 stars: 5
             },
             {
                 name: "상품 3",
                 desc: "간단한 설명",
-                price: "₩29,900",
+                price: 29900,
                 img: "https://via.placeholder.com/220x220",
                 stars: 3
             },
             {
                 name: "상품 4",
                 desc: "간단한 설명",
-                price: "₩14,900",
+                price: 14900,
                 img: "https://via.placeholder.com/220x220",
                 stars: 4
             },
             {
                 name: "상품 5",
                 desc: "신상품 소개",
-                price: "₩34,900",
+                price: 34900,
                 img: "https://via.placeholder.com/220x220",
                 stars: 5
             }
         ];
+
+        let cart = [];
 
         function renderProducts(filter = "") {
             const list = document.getElementById("productList");
@@ -213,7 +275,7 @@
       <img src="${product.img}" alt="${product.name}">
       <h3>${product.name}</h3>
       <p>${product.desc}</p>
-      <div class="price">${product.price}</div>
+      <div class="price">₩${product.price.toLocaleString()}</div>
       <div class="stars">${"★".repeat(product.stars)}${"☆".repeat(5-product.stars)}</div>
       <button onclick="addToCart('${product.name}')">장바구니 담기</button>
     `;
@@ -222,13 +284,51 @@
         }
 
         function addToCart(name) {
+            const product = products.find(p => p.name === name);
+            const item = cart.find(c => c.name === name);
+            if (item) {
+                item.qty += 1;
+            } else {
+                cart.push({
+                    ...product,
+                    qty: 1
+                });
+            }
+            updateCart();
             alert(`${name}이(가) 장바구니에 추가되었습니다!`);
+        }
+
+        function updateCart() {
+            const cartItems = document.getElementById("cartItems");
+            cartItems.innerHTML = "";
+            let total = 0;
+
+            cart.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "cart-item";
+                div.innerHTML = `
+      <span>${item.name} x ${item.qty}</span>
+      <span>₩${(item.price * item.qty).toLocaleString()}</span>
+    `;
+                cartItems.appendChild(div);
+                total += item.price * item.qty;
+            });
+
+            document.getElementById("cartCount").textContent = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cartTotal").textContent = `₩${total.toLocaleString()}`;
+        }
+
+        function toggleCart() {
+            document.getElementById("cartModal").classList.toggle("active");
         }
 
         // 검색 기능
         document.getElementById("searchInput").addEventListener("input", e => {
             renderProducts(e.target.value);
         });
+
+        // 장바구니 버튼 클릭
+        document.getElementById("cartBtn").addEventListener("click", toggleCart);
 
         // 초기 렌더링
         renderProducts();
