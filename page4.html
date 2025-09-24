@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Shop - Google Sheets 연동</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background:#f8f8f8; }
+  header { background:#fff; padding:16px 24px; box-shadow:0 2px 6px rgba(0,0,0,.08); display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:100;}
+  header h1 { margin:0; color:#ff6f61; font-size:20px; }
+  #searchInput { margin-left:auto; padding:6px 10px; border-radius:6px; border:1px solid #ddd; width:220px; }
+  #cartBtn { margin-left:12px; cursor:pointer; }
+
+  .banner { height:200px; background:url('https://picsum.photos/seed/shop-banner/1200/300') center/cover no-repeat; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:700; text-shadow:0 2px 6px rgba(0,0,0,.4) }
+
+  .products { display:flex; flex-wrap:wrap; gap:16px; padding:24px; justify-content:center; }
+  .product { width:220px; background:#fff; padding:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.06); display:flex; flex-direction:column; gap:8px; }
+  .product img { width:100%; height:160px; object-fit:cover; border-radius:8px; }
+  .product h3 { font-size:16px; margin:0; color:#222; }
+  .product p { font-size:13px; color:#666; margin:0; min-height:36px; }
+  .price { color:#ff6f61; font-weight:700; margin-top:4px; }
+  .stars { color:#ffcc00; font-size:14px; }
+
+  .product button { margin-top:8px; padding:8px; border-radius:6px; border:none; background:#ff6f61; color:#fff; cursor:pointer; }
+
+  /* cart modal (right slide) */
+  #cartModal { position:fixed; right:-420px; top:0; width:380px; height:100%; background:#fff; box-shadow:-8px 0 24px rgba(0,0,0,.12); padding:16px; transition: right .28s ease; z-index:200; overflow:auto; }
+  #cartModal.open { right:0; }
+  #cartModal h2 { margin-top:0; display:flex; justify-content:space-between; align-items:center; }
+  .cart-item { display:flex; justify-content:space-between; gap:8px; margin-bottom:10px; align-items:center; }
+  .qty-controls button { padding:4px 8px; }
+  footer { text-align:center; padding:18px; background:#222; color:#fff; margin-top:24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>My Shop</h1>
+  <input id="searchInput" placeholder="상품 검색..." />
+  <div id="cartBtn">🛒 장바구니 (<span id="cartCount">0</span>)</div>
+</header>
+
+<div class="banner">오늘의 추천 · 빠른 배송</div>
+
+<main>
+  <section class="products" id="productList">로딩중...</section>
+</main>
+
+<div id="cartModal" aria-hidden="true">
+  <h2>장바구니 <button onclick="toggleCart()">닫기 ✖</button></h2>
+  <div id="cartItems"></div>
+  <h3>총합계: <span id="cartTotal">₩0</span></h3>
+</div>
+
+<footer>&copy; 2025 My Shop</footer>
+
+<!-- PapaParse (CSV 안정 파싱) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+<script>
+  // → 여기에 Google Sheets에서 "파일 → 웹에 게시"로 만든 CSV 공개 링크를 넣어라
+  const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNFfSjIuv4Ous-NUe2WB3aJRrI4_sFu6i0ryGJn_1xxJ56n3vRn6ys3-1Yvc3saVgkMiqHummVJUkz/pub?output=csv";
+
+  let products = [];
+  let cart = [];
+
+  // CSV를 파싱해서 products 배열로 변환
+  function loadProductsFromCSV(url) {
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        // results.data는 객체 배열 (헤더를 키로 사용)
+        products = results.data
+          .filter(r => r.name && r.name.trim() !== "")
+          .map(r => ({
+            name: r.name.trim(),
+            desc: r.desc ? r.desc.trim() : "",
+            price: r.price ? parseInt(r.price.replace(/[^0-9]/g,'')) : 0,
+            img: r.img && r.img.trim() !== "" ? r.img.trim() : "https://picsum.photos/seed/default/400/400",
+            stars: r.stars ? Math.max(0, Math.min(5, parseInt(r.stars))) : 0
+          }));
+        renderProducts(products);
+      },
+      error: function(err) {
+        document.getElementById('productList').innerText = "데이터 로드 실패: " + err.message;
+      }
+    });
+  }
+
+  // 제품 렌더링
+  function renderProducts(list) {
+    const container = document.getElementById('productList');
+    container.innerHTML = "";
+    if (!list || list.length === 0) { container.innerHTML = "<p>표시할 상품이 없습니다.</p>"; return; }
+
+    list.forEach((p, idx) => {
+      const card = document.createElement('div');
+      card.className = 'product';
+      card.innerHTML = `
+        <img src="${p.img}" alt="${p.name}" loading="lazy" />
+        <h3>${p.name}</h3>
+        <p>${p.desc}</p>
+        <div class="price">₩${p.price.toLocaleString()}</div>
+        <div class="stars">${'★'.repeat(p.stars)}${'☆'.repeat(5-p.stars)}</div>
+        <button data-index="${idx}">장바구니 담기</button>
+      `;
+      card.querySelector('button').addEventListener('click', () => addToCartByIndex(idx));
+      container.appendChild(card);
+    });
+  }
+
+  // 검색
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    const filtered = products.filter(p => p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q));
+    renderProducts(filtered);
+  });
+
+  // 장바구니 관련
+  function addToCartByIndex(idx) {
+    const p = products[idx];
+    if(!p) return;
+    const existing = cart.find(c => c.name === p.name);
+    if(existing) existing.qty += 1;
+    else cart.push({ ...p, qty: 1 });
+    updateCartUI();
+    alert(`${p.name}이(가) 장바구니에 추가되었습니다.`);
+  }
+
+  function updateCartUI() {
+    document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.qty, 0);
+    const itemsEl = document.getElementById('cartItems');
+    itemsEl.innerHTML = "";
+    let total = 0;
+    cart.forEach((it, i) => {
+      total += it.price * it.qty;
+      const div = document.createElement('div');
+      div.className = 'cart-item';
+      div.innerHTML = `
+        <div style="flex:1">
+          <strong>${it.name}</strong><div style="font-size:12px;color:#666">${it.price.toLocaleString()}원</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="qty-controls">
+            <button onclick="changeQty(${i},-1)">-</button>
+            <span style="padding:0 8px">${it.qty}</span>
+            <button onclick="changeQty(${i},1)">+</button>
+          </div>
+          <div style="width:80px;text-align:right">₩${(it.price*it.qty).toLocaleString()}</div>
+          <button onclick="removeItem(${i})">삭제</button>
+        </div>
+      `;
+      itemsEl.appendChild(div);
+    });
+    document.getElementById('cartTotal').innerText = `₩${total.toLocaleString()}`;
+  }
+
+  function changeQty(index, delta) {
+    cart[index].qty += delta;
+    if(cart[index].qty <= 0) cart.splice(index,1);
+    updateCartUI();
+  }
+
+  function removeItem(index) {
+    cart.splice(index,1);
+    updateCartUI();
+  }
+
+  function toggleCart() {
+    const modal = document.getElementById('cartModal');
+    modal.classList.toggle('open');
+    modal.setAttribute('aria-hidden', !modal.classList.contains('open'));
+  }
+
+  document.getElementById('cartBtn').addEventListener('click', toggleCart);
+
+  // 초기 로드 (sheetUrl 바꿔서 사용)
+  loadProductsFromCSV(sheetUrl);
+</script>
+
+</body>
+</html>
